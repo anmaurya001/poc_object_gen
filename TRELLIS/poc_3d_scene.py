@@ -32,6 +32,7 @@ if os.path.exists(prompts_file):
     except Exception as e:
         logger.error(f"Failed to delete {prompts_file}: {e}")
 
+Path("generated_assets").mkdir(parents=True, exist_ok=True)
 # Load environment variables
 load_dotenv()
 

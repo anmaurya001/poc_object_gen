@@ -1,5 +1,5 @@
 # TRELLIS folder (should be cloned separately)
-TRELLIS/
+# TRELLIS/
 
 # Python
 __pycache__/
@@ -43,4 +43,11 @@ env/
 *.blend1
 *.blend2
 prompts.json
-generated_assets/ 
+generated_assets/
+
+# Sample files and temporary directories
+TRELLIS/sample.ply
+TRELLIS/sample_*.mp4
+TRELLIS/tmp/
+*.mp4
+*.ply 

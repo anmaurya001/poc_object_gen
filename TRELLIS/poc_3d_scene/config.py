@@ -10,6 +10,9 @@ PROMPTS_FILE = BASE_DIR / "prompts.json"
 TRELLIS_MODEL = "JeffreyXiang/TRELLIS-text-large"
 SPCONV_ALGO = "native"
 
+# INITIAL MESSAGE
+INITIAL_MESSAGE = "Hello! I'm your helpful scene planning assistant. Please describe the scene you'd like to create."
+
 # Generation parameters
 DEFAULT_SEED = 42
 DEFAULT_SPARSE_STEPS = 25
@@ -22,4 +25,4 @@ AGENT_BASE_URL = "http://localhost:8000/v1"
 
 # Logging configuration
 LOG_LEVEL = "INFO"
-LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s" 
+LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

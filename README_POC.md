@@ -65,8 +65,8 @@ pip install -r requirements.txt
 set ATTN_BACKEND=flash-attn
 set SPCONV_ALGO=native
 set XFORMERS_FORCE_DISABLE_TRITON=1
-cd TRELLIS
-python poc_3d_scene.py
+cd TRELLIS/poc_3d_scene
+python run.py
 ```
 
 2. Open your browser to the URL shown in the terminal (typically http://localhost:7860)

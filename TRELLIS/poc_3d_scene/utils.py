@@ -24,17 +24,15 @@ def save_prompts_to_json(scene_name, object_prompts, initial_description=None):
             "timestamp": datetime.now().isoformat(),
         }
 
-        # Read existing data if file exists
+        # Delete existing file if it exists
         if os.path.exists(PROMPTS_FILE):
-            with open(PROMPTS_FILE, "r") as f:
-                data = json.load(f)
-        else:
-            data = {"scenes": []}
+            os.remove(PROMPTS_FILE)
+            logger.info(f"Deleted existing {PROMPTS_FILE}")
 
-        # Add new scene
-        data["scenes"].append(new_scene)
+        # Create new data structure with just this scene
+        data = {"scenes": [new_scene]}
 
-        # Save updated data
+        # Save data
         with open(PROMPTS_FILE, "w") as f:
             json.dump(data, f, indent=4)
 

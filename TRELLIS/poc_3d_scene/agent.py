@@ -14,11 +14,106 @@ logger = logging.getLogger(__name__)
 
 class ScenePlanningAgent:
     def __init__(self):
-        self.conversation_memory = ConversationMemory()
+        self.memory = ConversationMemory()
         self.agent = self._initialize_agent()
+        self.is_generating_prompts = False
+
+    def _get_planning_rules(self):
+        """Get rules for scene planning phase."""
+        return [
+            Rule(
+                "You are a helpful scene planning assistant for 3D content creation."
+            ),
+            Rule(
+                "Your primary task is to assist the user in planning a 3D scene by suggesting objects and layouts."
+            ),
+            Rule(
+                "You must maintain a strict limit of 10 objects in the scene at all times."
+            ),
+            Rule(
+                "When adding new objects, you must remove existing ones to stay within the 10-object limit."
+            ),
+            Rule(
+                "If the user requests more than 10 objects, explain that we need to stay within the limit and ask which objects to remove."
+            ),
+            Rule(
+                "Based on the user's description of a desired scene, propose a list of suitable 3D objects."
+            ),
+            Rule(
+                "Also, provide a basic description of how these objects could be arranged or laid out within the scene."
+            ),
+            Rule(
+                "Explain that you can modify the suggested objects and layout based on their feedback."
+            ),
+            Rule(
+                "Acknowledge that the goal is eventually to generate text prompts for 3D modeling tools like TRELLIS."
+            ),
+            Rule(
+                "Keep your initial response concise and focused on the object list and layout description."
+            ),
+            Rule(
+                "When receiving feedback, clearly indicate what changes you're making to the scene."
+            ),
+            Rule(
+                "After each modification, ask if the user would like to make any further adjustments."
+            ),
+            Rule(
+                "Always list the current objects in the scene and confirm the total count is 10 or less."
+            ),
+            Rule(
+                "When the user is satisfied with the scene, tell them they can click the 'Generate 3D Prompts' button to create 3D prompts."
+            ),
+            Rule(
+                "If the user asks to generate 3D prompts in chat, remind them to use the 'Generate 3D Prompts' button instead. Your role is only to help plan and modify the scene."
+            ),
+            Rule(
+                "DO NOT describe the visual or physical characteristics of objects during the planning phase."
+            ),
+            Rule(
+                "DO NOT discuss materials, textures, or surface properties during the planning phase."
+            ),
+            Rule(
+                "Focus only on object names and their spatial arrangement during the planning phase."
+            ),
+            # Rule(
+            #     "Save detailed object descriptions for the 3D prompt generation phase."
+            # ),
+            Rule(
+                "When the user asks to edit or modify items in the scene, only update the object list and layout. Do not generate prompts or switch to generation mode."
+            ),
+        ]
+
+    def _get_prompt_generation_rules(self):
+        """Get rules for 3D prompt generation phase."""
+        return [
+            Rule(
+                "You are now in 3D prompt generation mode. Your task is to create detailed prompts for each object in the scene."
+            ),
+            Rule(
+                "For each object, focus on key visual and physical characteristics."
+            ),
+            Rule(
+                "Include details about the object's shape, size, materials, and surface properties."
+            ),
+            Rule(
+                "Incorporate the object's context and relationship to other objects in the scene."
+            ),
+            Rule(
+                "Keep each object's prompt to exactly 40 words or less for optimal generation quality."
+            ),
+            Rule(
+                "Use descriptive adjectives and specific material terms to enhance the 3D generation."
+            ),
+            Rule(
+                "Generate a separate prompt for each object in the scene."
+            ),
+            Rule(
+                "Format each object's prompt with 'Object:' and 'Prompt:' labels."
+            ),
+        ]
 
     def _initialize_agent(self):
-        """Initialize the agent with rules and settings."""
+        """Initialize the agent with initial planning rules."""
         try:
             prompt_driver = OpenAiChatPromptDriver(
                 model=AGENT_MODEL,
@@ -32,76 +127,23 @@ class ScenePlanningAgent:
 
         agent = Agent(
             prompt_driver=prompt_driver,
-            rules=[
-                Rule(
-                    "You are a helpful scene planning assistant for 3D content creation."
-                ),
-                Rule(
-                    "Your primary task is to assist the user in planning a 3D scene by suggesting objects and layouts."
-                ),
-                Rule(
-                    "You must maintain a strict limit of 10 objects in the scene at all times."
-                ),
-                Rule(
-                    "When adding new objects, you must remove existing ones to stay within the 10-object limit."
-                ),
-                Rule(
-                    "If the user requests more than 10 objects, explain that we need to stay within the limit and ask which objects to remove."
-                ),
-                Rule(
-                    "Based on the user's description of a desired scene, propose a list of suitable 3D objects."
-                ),
-                Rule(
-                    "Also, provide a basic description of how these objects could be arranged or laid out within the scene."
-                ),
-                Rule(
-                    "Explain that you can modify the suggested objects and layout based on their feedback."
-                ),
-                Rule(
-                    "Acknowledge that the goal is eventually to generate text prompts for 3D modeling tools like TRELLIS."
-                ),
-                Rule(
-                    "Keep your initial response concise and focused on the object list and layout description."
-                ),
-                Rule(
-                    "When receiving feedback, clearly indicate what changes you're making to the scene."
-                ),
-                Rule(
-                    "After each modification, ask if the user would like to make any further adjustments."
-                ),
-                Rule(
-                    "Always list the current objects in the scene and confirm the total count is 10 or less."
-                ),
-                Rule(
-                    "When generating 3D prompts, focus on key visual and physical characteristics of each object."
-                ),
-                Rule(
-                    "For each object, include details about its shape, size, materials, and surface properties."
-                ),
-                Rule(
-                    "Incorporate the object's context and relationship to other objects in the scene."
-                ),
-                Rule(
-                    "Keep each object's prompt to exactly 40 words or less for optimal generation quality."
-                ),
-                Rule(
-                    "Use descriptive adjectives and specific material terms to enhance the 3D generation."
-                ),
-                Rule(
-                    "When the scene is finalized, generate a separate prompt for each object in the scene."
-                ),
-            ],
+            rules=self._get_planning_rules(),
         )
-        agent.memory = self.conversation_memory
+        agent.memory = self.memory
         return agent
 
     def chat(self, message):
-        """Handle chat interaction with the agent."""
+        """Handle chat messages and provide scene planning assistance."""
         try:
+            # Always ensure we're in planning mode
+            if self.is_generating_prompts:
+                self.agent.rules = self._get_planning_rules()
+                self.is_generating_prompts = False
+
+            # Normal chat response - always in planning mode
+            self.agent.rules = self._get_planning_rules()
             response = self.agent.run(message)
-            response_text = (
-                response.output.value if hasattr(response, "output") else str(response)
-            )
+            response_text = response.output.value if hasattr(response, "output") else str(response)
             return response_text
         except Exception as e:
             logger.error(f"Error in chat: {e}")
@@ -136,6 +178,11 @@ class ScenePlanningAgent:
     def generate_3d_prompts(self, scene_name, initial_description):
         """Generate 3D prompts for each object in the final scene."""
         try:
+            logger.info("Switching to prompt generation mode")
+            # Switch to prompt generation mode
+            self.agent.rules = self._get_prompt_generation_rules()
+            self.is_generating_prompts = True
+
             generation_prompt = f"""Generate detailed 3D prompts for each object in the current scene, focusing on:
             1. Visual and physical characteristics
             2. Materials and surface properties
@@ -144,7 +191,6 @@ class ScenePlanningAgent:
             Keep each prompt to exactly 40 words or less.
             Format each object's prompt with 'Object:' and 'Prompt:' labels.
             """
-            #Scene description: {initial_description}"""
 
             response = self.agent.run(generation_prompt)
 
@@ -197,8 +243,16 @@ class ScenePlanningAgent:
         except Exception as e:
             logger.error(f"Error generating prompts: {e}")
             return False, None, generation_prompt
+        finally:
+            # Always switch back to planning mode after generation
+            logger.info("Switching back to planning mode after generation")
+            self.agent.rules = self._get_planning_rules()
+            self.is_generating_prompts = False
+            
 
     def clear_memory(self):
-        """Clear the conversation memory."""
-        self.conversation_memory = ConversationMemory()
-        self.agent.memory = self.conversation_memory
+        """Clear conversation memory."""
+        self.memory = ConversationMemory()
+        self.agent.memory = self.memory
+        # Reinitialize the agent to get a fresh context
+        self.agent = self._initialize_agent()

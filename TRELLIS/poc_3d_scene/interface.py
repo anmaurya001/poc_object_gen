@@ -40,8 +40,10 @@ class SceneGeneratorInterface:
                             clear_btn = gr.Button("Clear Chat")
 
                             def clear_chat():
+                                # Clear agent's memory
                                 self.agent.clear_memory()
-                                return [("Assistant", self.INITIAL_MESSAGE)]
+                                # Reset chat display to initial message
+                                return [(None, self.INITIAL_MESSAGE)]
 
                             clear_btn.click(clear_chat, outputs=chatbot)
 
@@ -54,12 +56,17 @@ class SceneGeneratorInterface:
                             submit_btn.click(respond, [msg, chatbot], [chatbot, msg])
                             msg.submit(respond, [msg, chatbot], [chatbot, msg])
 
-                            with gr.Row():
-                                confirm_objects_btn = gr.Button("Confirm Objects List")
-                                generate_prompts_btn = gr.Button("Generate 3D Prompts")
+                            gr.Markdown("""
+                            ### Ready to Generate 3D Prompts?
+                            When you're satisfied with your scene, click the 'Generate 3D Prompts' button below to create detailed 3D prompts for each object.
+                            """)
+                            
+                            generate_prompts_btn = gr.Button("Generate 3D Prompts")
 
                             prompts_output = gr.Textbox(
-                                label="Generated Prompts", lines=10
+                                label="Generated Prompts", 
+                                lines=10,
+                                show_copy_button=True
                             )
                             generation_prompt_display = gr.Textbox(
                                 label="Generation Prompt Used",
@@ -67,31 +74,12 @@ class SceneGeneratorInterface:
                                 interactive=False,
                             )
 
-                            def on_confirm_objects(chat_history):
-                                if not chat_history or len(chat_history) == 1:
-                                    return "Please describe your scene first!"
-
-                                response = self.agent.chat("""Please list all the current objects in the scene and ask the user if they are happy with this list.
-                                If they are happy, they can click the 'Generate 3D Prompts' button to proceed.""")
-                                # Use a special message to indicate the confirmation action
-                                chat_history.append(("[User confirmed object list]", response))  # noqa: E501
-                                return chat_history
-
                             def on_generate_prompts(chat_history):
                                 if not chat_history or len(chat_history) == 1:
                                     return "Please describe your scene first!", ""
 
                                 # Get the last message
                                 last_user_message, last_assistant_response = chat_history[-1]
-                                print(f"Last user message: {last_user_message}")
-                                print(f"Last assistant response: {last_assistant_response}")
-
-                                # Check if the last message was the confirmation
-                                if last_user_message != "[User confirmed object list]":
-                                    return (
-                                        "Please confirm the objects list first!",
-                                        "",
-                                    )
 
                                 scene_name = self.agent.generate_scene_name(
                                     last_assistant_response
@@ -113,9 +101,6 @@ class SceneGeneratorInterface:
                                         "",
                                     )
 
-                            confirm_objects_btn.click(
-                                on_confirm_objects, [chatbot], [chatbot]
-                            )
                             generate_prompts_btn.click(
                                 on_generate_prompts,
                                 [chatbot],

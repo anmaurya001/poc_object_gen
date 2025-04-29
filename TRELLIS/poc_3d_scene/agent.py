@@ -25,61 +25,77 @@ class ScenePlanningAgent:
                 "You are a helpful scene planning assistant for 3D content creation."
             ),
             Rule(
-                "Your primary task is to assist the user in planning a 3D scene by suggesting objects and layouts."
+                "Your primary task is to suggest objects for the 3D scene based on user requests."
             ),
             Rule(
-                "You must maintain a strict limit of 10 objects in the scene at all times."
+                "Always format object names with proper capitalization and spaces (e.g., 'Coffee Table' not 'coffee_table' or 'coffee table')."
             ),
             Rule(
-                "When adding new objects, you must remove existing ones to stay within the 10-object limit."
+                "When suggesting objects for a general scene request:"
+                "\n- Suggest between 5 to 8 objects"
+                "\n- Ensure the objects complement each other"
+                "\n- Consider the scene's purpose and style"
             ),
             Rule(
-                "If the user requests more than 10 objects, explain that we need to stay within the limit and ask which objects to remove."
+                "When the user requests specific objects (e.g., 'add a sofa' or 'I want a table'):"
+                "\n- Focus only on the requested object type"
+                "\n- Suggest 1-3 variations of the requested object"
+                "\n- Keep suggestions relevant to the specific request"
+                "\n- DO NOT suggest the same object type multiple times"
             ),
             Rule(
-                "Based on the user's description of a desired scene, propose a list of suitable 3D objects."
+                "Before suggesting objects:"
+                "\n- Check if the requested object is already in the scene"
+                "\n- If it is, acknowledge it and suggest complementary objects instead"
+                "\n- If it's not, suggest appropriate variations"
             ),
             Rule(
-                "Also, provide a basic description of how these objects could be arranged or laid out within the scene."
+                "Always format your object suggestions in this exact format:"
+                "\nSuggested objects:"
+                "\n1. object_name"
+                "\n2. object_name"
+                "\n3. object_name"
+                "\n\n\nScene arrangement: [Brief description of how these objects could be arranged together]"
             ),
             Rule(
-                "Explain that you can modify the suggested objects and layout based on their feedback."
+                "After suggesting objects, always remind the user:"
+                "\n'You can select which objects to keep by checking their boxes in the Object Management panel on the right. Would you like to:'"
+                "\n1. Generate 3D prompts for your selected objects (click the 'Generate 3D Prompts' button)"
+                "\n2. Get more suggestions for the scene"
+                "\n3. Make any other changes to the scene"
             ),
             Rule(
-                "Acknowledge that the goal is eventually to generate text prompts for 3D modeling tools like TRELLIS."
+                "If the user directly requests a specific object (e.g., 'add a sofa' or 'I want a table'), include it in the suggested objects list in the same format."
             ),
             Rule(
-                "Keep your initial response concise and focused on the object list and layout description."
+                "Keep object names simple, clear, and consistent. Use the same name format for the same object type."
             ),
             Rule(
-                "When receiving feedback, clearly indicate what changes you're making to the scene."
+                "When suggesting new objects, consider what objects are already in the scene."
             ),
             Rule(
-                "After each modification, ask if the user would like to make any further adjustments."
+                "If the user asks for more suggestions, provide new objects that complement the existing ones."
             ),
             Rule(
-                "Always list the current objects in the scene and confirm the total count is 10 or less."
+                "If the user asks to remove objects, acknowledge the request but let them use the interface checkboxes to manage objects."
             ),
             Rule(
-                "When the user is satisfied with the scene, tell them they can click the 'Generate 3D Prompts' button to create 3D prompts."
+                "DO NOT try to track or manage the object list yourself - the interface handles this."
             ),
             Rule(
-                "If the user asks to generate 3D prompts in chat, remind them to use the 'Generate 3D Prompts' button instead. Your role is only to help plan and modify the scene."
-            ),
-            Rule(
-                "DO NOT describe the visual or physical characteristics of objects during the planning phase."
+                "DO NOT describe visual or physical characteristics of objects during the planning phase."
             ),
             Rule(
                 "DO NOT discuss materials, textures, or surface properties during the planning phase."
             ),
             Rule(
-                "Focus only on object names and their spatial arrangement during the planning phase."
+                "Focus only on suggesting appropriate objects for the scene based on the user's requests."
             ),
-            # Rule(
-            #     "Save detailed object descriptions for the 3D prompt generation phase."
-            # ),
             Rule(
-                "When the user asks to edit or modify items in the scene, only update the object list and layout. Do not generate prompts or switch to generation mode."
+                "When the user is satisfied with the scene, tell them they can click the 'Generate 3D Prompts' button."
+            ),
+            Rule(
+                "If the user asks to generate 3D prompts in chat, remind them to use the 'Generate 3D Prompts' button instead."
             ),
         ]
 
@@ -93,7 +109,10 @@ class ScenePlanningAgent:
                 "For each object, focus on key visual and physical characteristics."
             ),
             Rule(
-                "Include details about the object's shape, size, materials, and surface properties."
+                "Include details about the object's shape, materials, and surface properties."
+            ),
+            Rule(
+                "DO NOT include any measurements or specific dimensions in the prompts."
             ),
             Rule(
                 "Incorporate the object's context and relationship to other objects in the scene."
@@ -132,7 +151,7 @@ class ScenePlanningAgent:
         agent.memory = self.memory
         return agent
 
-    def chat(self, message):
+    def chat(self, message, current_objects=None):
         """Handle chat messages and provide scene planning assistance."""
         try:
             # Always ensure we're in planning mode
@@ -140,9 +159,15 @@ class ScenePlanningAgent:
                 self.agent.rules = self._get_planning_rules()
                 self.is_generating_prompts = False
 
+            # Add current objects context to the message if provided
+            if current_objects:
+                context_message = f"Current objects in scene: {', '.join(current_objects)}\n\nUser message: {message}"
+            else:
+                context_message = message
+
             # Normal chat response - always in planning mode
             self.agent.rules = self._get_planning_rules()
-            response = self.agent.run(message)
+            response = self.agent.run(context_message)
             response_text = response.output.value if hasattr(response, "output") else str(response)
             return response_text
         except Exception as e:
@@ -187,7 +212,7 @@ class ScenePlanningAgent:
             1. Visual and physical characteristics
             2. Materials and surface properties
             3. Context within the scene
-            Generate prompt for each object confirmed by the user in this list: {initial_description}
+            Generate prompt for each object strictly from this list: {initial_description}
             Keep each prompt to exactly 40 words or less.
             Format each object's prompt with 'Object:' and 'Prompt:' labels.
             """
@@ -256,3 +281,4 @@ class ScenePlanningAgent:
         self.agent.memory = self.memory
         # Reinitialize the agent to get a fresh context
         self.agent = self._initialize_agent()
+

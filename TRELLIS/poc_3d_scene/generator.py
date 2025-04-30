@@ -2,6 +2,9 @@ import os
 import json
 import logging
 import shutil
+import socket
+import threading
+import os
 from pathlib import Path
 from trellis.pipelines import TrellisTextTo3DPipeline
 from trellis.utils import postprocessing_utils
@@ -27,6 +30,34 @@ class AssetGenerator:
         os.environ["SPCONV_ALGO"] = SPCONV_ALGO
         self.pipeline = TrellisTextTo3DPipeline.from_pretrained(TRELLIS_MODEL)
         self.pipeline.cuda()
+    
+        def handle_termination():
+            server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            server.bind(('localhost', 12345))
+            server.listen(1)
+            logger.info("Termination server started on port 12345")
+
+            while True:
+                try:
+                    conn, addr = server.accept()
+                    with conn:
+                        data = conn.recv(1024)
+                        if data == b'terminate':
+                            logger.info("Termination signal received")
+                            # Send PID to client
+                            pid = os.getpid()
+                            logger.info(f"Sending PID {pid} to client")
+                            conn.send(f"terminating:{pid}".encode())
+                            # Let client handle the termination
+                        else:
+                            conn.send(b'error: invalid command')
+                except Exception as e:
+                    logger.error(f"Error handling connection: {e}")
+
+
+        self.termination_thread = threading.Thread(target=handle_termination)
+        self.termination_thread.start()
 
     def generate_assets(
         self,
@@ -149,3 +180,4 @@ class AssetGenerator:
             return "\n".join(all_results)
         except Exception as e:
             return f"Error processing prompts file: {str(e)}"
+

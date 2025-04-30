@@ -8,6 +8,7 @@ A proof-of-concept application that combines natural language processing with 3D
 - AI-assisted object suggestion and layout
 - Automatic 3D asset generation from text prompts
 - Blender auto-import functionality for generated assets
+- VRAM management with process termination
 
 ## Prerequisites
 
@@ -69,15 +70,24 @@ cd TRELLIS/poc_3d_scene
 python run.py
 ```
 
-2. Open your browser to the URL shown in the terminal (typically http://localhost:7860)
+3. Open your browser to the URL shown in the terminal (typically http://localhost:7860)
 
-3. Use the interface to:
+4. Use the interface to:
    - Describe your scene
    - Get AI suggestions for objects
    - Generate 3D assets
    - Auto-import into Blender
+
+5. To terminate the application and free VRAM:
+```bash
+python terminator.py
+```
+This will:
+- Gracefully terminate the Gradio application
+- Free up GPU memory
+- Allow you to proceed with other operations (e.g., Blender)
   
-4. Blender Integration
+6. Blender Integration
     - Open Blender
     - Click on Scripting and New.
     - Paste the script from blender/auto_import.py.

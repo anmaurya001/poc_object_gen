@@ -1,150 +1,223 @@
 import bpy
 import os
-import time
-from pathlib import Path
-import math
+import tempfile
 
-# Set this to your output_glb directory
+# Directories
 WATCH_DIR = "F:/poc/text_to_3d/TRELLIS/generated_assets"
+ASSET_LIBRARY_DIR = "F:/poc/text_to_3d/blender_assets"
+COMBINED_BLEND_FILE = os.path.join(ASSET_LIBRARY_DIR, "trellis_assets.blend")
 
-class GLBWatcherOperator(bpy.types.Operator):
-    """Watch directory for new GLB files"""
-    bl_idname = "wm.glb_watcher"
-    bl_label = "GLB Watcher"
-    
-    _timer = None
-    existing_files = set()
-    processing_files = set()  # Track files being processed
-    is_running = False  # Flag to control the watcher
-    grid_size = 2.0  # Distance between objects in the grid
-    current_x = 0.0  # Current X position for new objects
-    current_z = 0.0  # Current Z position for new objects
-    max_objects_per_row = 5 # Maximum number of objects per row
-    
-    def get_next_position(self):
-        """Calculate the next position for a new object in a grid layout"""
-        # Calculate row and column
-        total_objects = len(bpy.data.objects)
-        row = total_objects // self.max_objects_per_row
-        col = total_objects % self.max_objects_per_row
+# Create asset library directory if it doesn't exist
+os.makedirs(ASSET_LIBRARY_DIR, exist_ok=True)
+
+def register_asset_library():
+    """Register the asset library with Blender's preferences"""
+    try:
+        # Get absolute path for consistency
+        absolute_path = os.path.abspath(ASSET_LIBRARY_DIR)
         
-        # Calculate position
-        x = col * self.grid_size
-        z = -row * self.grid_size  # Negative Z to move forward
+        # Check if already registered
+        library_exists = False
+        asset_libraries = bpy.context.preferences.filepaths.asset_libraries
+        for library in asset_libraries:
+            if os.path.abspath(library.path) == absolute_path:
+                library_exists = True
+                print(f"Asset library already registered: {absolute_path}")
+                break
         
-        return x, 0.0, z
-    
-    def modal(self, context, event):
-        if not self.is_running:
-            self.cancel(context)
-            return {'FINISHED'}
+        # Register if not found
+        if not library_exists:
+            # Add the library (method depends on Blender version)
+            library = None
+            if hasattr(asset_libraries, 'new'):
+                library = asset_libraries.new(name="TRELLIS Assets")
+            else:
+                library = asset_libraries.add()
+                library.name = "TRELLIS Assets"
             
-        if event.type == 'TIMER':
-            try:
-                # Check for new files
-                current_files = set(f for f in os.listdir(WATCH_DIR) if f.endswith('.glb'))
-                new_files = current_files - self.existing_files - self.processing_files
-                
-                if new_files:
-                    # Import the newest file
-                    newest_file = max(new_files, key=lambda f: os.path.getctime(os.path.join(WATCH_DIR, f)))
-                    filepath = os.path.join(WATCH_DIR, newest_file)
-                    
-                    # Check if file is still being written
-                    initial_size = os.path.getsize(filepath)
-                    time.sleep(0.5)  # Wait a bit
-                    if os.path.getsize(filepath) != initial_size:
-                        print(f"File {newest_file} is still being written, skipping...")
-                        return {'PASS_THROUGH'}
-                    
-                    # Add to processing set
-                    self.processing_files.add(newest_file)
-                    
-                    try:
-                        # Get the next position for the new object
-                        next_pos = self.get_next_position()
-                        
-                        # Import the new GLB file
-                        bpy.ops.import_scene.gltf(filepath=filepath)
-                        
-                        # Move the newly imported object to the next position
-                        for obj in bpy.context.selected_objects:
-                            obj.location = next_pos
-                        
-                        # Try to center view, but don't fail if it doesn't work
-                        try:
-                            for area in bpy.context.screen.areas:
-                                if area.type == 'VIEW_3D':
-                                    for region in area.regions:
-                                        if region.type == 'WINDOW':
-                                            override = {'area': area, 'region': region}
-                                            bpy.ops.view3d.view_all(override)
-                                            break
-                        except Exception as e:
-                            print(f"Could not center view: {str(e)}")
-                        
-                        print(f"Successfully imported: {newest_file}")
-                        
-                        # Update existing files list
-                        self.existing_files = current_files
-                        
-                    except Exception as e:
-                        print(f"Error importing {newest_file}: {str(e)}")
-                    
-                    finally:
-                        # Remove from processing set
-                        self.processing_files.discard(newest_file)
-            
-            except Exception as e:
-                print(f"Error in watcher: {str(e)}")
+            library.path = absolute_path
+            bpy.ops.wm.save_userpref()
+            print(f"Successfully registered asset library: {absolute_path}")
         
-        return {'PASS_THROUGH'}
+        return True
+    except Exception as e:
+        print(f"Error registering asset library: {e}")
+        print(f"Please add manually: Edit > Preferences > File Paths > Asset Libraries")
+        return False
+
+def process_all_glb_files():
+    """Process all GLB files without disturbing the current scene"""
+    # Get all GLB files
+    if not os.path.exists(WATCH_DIR):
+        print(f"Watch directory does not exist: {WATCH_DIR}")
+        return
     
-    def execute(self, context):
-        # Initialize the existing files list
-        self.existing_files = set(f for f in os.listdir(WATCH_DIR) if f.endswith('.glb'))
-        self.processing_files = set()
-        self.is_running = True
+    glb_files = [f for f in os.listdir(WATCH_DIR) if f.endswith('.glb')]
+    
+    if not glb_files:
+        print("No GLB files found in the watch directory.")
+        return
+    
+    print(f"Found {len(glb_files)} GLB file(s). Processing...")
+    
+    # Print exact file path for debugging
+    print(f"Will save to: {COMBINED_BLEND_FILE}")
+    
+    # Create a temporary Blender script to process files separately
+    temp_script = f"""
+import bpy
+import os
+
+# Clear default scene
+bpy.ops.wm.read_factory_settings(use_empty=True)
+
+# Process GLB files
+files = {glb_files}
+watch_dir = r"{WATCH_DIR}"
+output_file = r"{COMBINED_BLEND_FILE}"
+
+for glb_file in files:
+    filepath = os.path.join(watch_dir, glb_file)
+    print(f"Processing: {{glb_file}}")
+    
+    # Get the file basename for naming
+    file_basename = os.path.splitext(glb_file)[0]
+    
+    # Deselect all objects before import
+    bpy.ops.object.select_all(action='DESELECT')
+    
+    # Import GLB file
+    bpy.ops.import_scene.gltf(filepath=filepath)
+    
+    # Find imported objects
+    imported_objects = bpy.context.selected_objects
+    if not imported_objects:
+        print(f"No objects were imported from {{glb_file}}. Skipping.")
+        continue
+    
+    # Create a temporary collection for organization
+    collection = bpy.data.collections.new(f"temp_{{file_basename}}")
+    bpy.context.scene.collection.children.link(collection)
+    
+    # Filter to keep only mesh objects
+    mesh_objects = [obj for obj in imported_objects if obj.type == 'MESH']
+    
+    # Delete non-mesh objects (empties, etc.)
+    non_mesh_objects = [obj for obj in imported_objects if obj.type != 'MESH']
+    if non_mesh_objects:
+        print(f"Removing {{len(non_mesh_objects)}} non-mesh objects")
+        for obj in non_mesh_objects:
+            bpy.data.objects.remove(obj)
+    
+    # If no mesh objects found, skip this file
+    if not mesh_objects:
+        print(f"No mesh objects found in {{glb_file}}. Skipping.")
+        bpy.data.collections.remove(collection)
+        continue
+    
+    # Move all mesh objects to the temporary collection
+    for obj in mesh_objects:
+        for coll in list(obj.users_collection):
+            coll.objects.unlink(obj)
+        collection.objects.link(obj)
+    
+    # Select all mesh objects in the collection
+    bpy.ops.object.select_all(action='DESELECT')
+    for obj in collection.objects:
+        obj.select_set(obj.type == 'MESH')
+    
+    # Set the active object (needed for join operation)
+    bpy.context.view_layer.objects.active = next((obj for obj in collection.objects if obj.type == 'MESH'), None)
+    
+    # Join them into a single object if there are multiple
+    if len([obj for obj in collection.objects if obj.type == 'MESH']) > 1:
+        bpy.ops.object.join()
+    
+    # After join, only one object remains (active object)
+    merged_obj = bpy.context.active_object
+    
+    # Rename object and its mesh data with proper name
+    merged_obj.name = file_basename
+    if merged_obj.data:
+        merged_obj.data.name = f"{{file_basename}}_mesh"
+    
+    # Move merged object out of the temporary collection
+    for coll in list(merged_obj.users_collection):
+        coll.objects.unlink(merged_obj)
+    bpy.context.scene.collection.objects.link(merged_obj)
+    
+    # Set origin to geometry
+    bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='BOUNDS')
+    
+    # Mark merged object as asset
+    merged_obj.asset_mark()
+    if hasattr(merged_obj, 'asset_data'):
+        merged_obj.asset_data.description = f"3D model generated by TRELLIS from {{glb_file}}"
+        merged_obj.asset_data.tags.new("TRELLIS")
+    
+    # Delete the now-empty collection
+    bpy.data.collections.remove(collection)
+    
+    print(f"Created asset object: {{file_basename}}")
+
+# Save the combined file
+print(f"Saving all assets to: {{output_file}}")
+bpy.ops.wm.save_as_mainfile(filepath=output_file)
+print("All assets saved successfully")
+"""
+    
+    # Write temporary script
+    temp_script_path = os.path.join(tempfile.gettempdir(), "process_assets.py")
+    
+    # Also save a copy to the assets directory for inspection
+    debug_script_path = os.path.join(ASSET_LIBRARY_DIR, "debug_script.py")
+    
+    with open(temp_script_path, 'w') as f:
+        f.write(temp_script)
+    
+    # Save a copy for debugging
+    with open(debug_script_path, 'w') as f:
+        f.write(temp_script)
         
-        # Start the timer
-        wm = context.window_manager
-        self._timer = wm.event_timer_add(1.0, window=context.window)
-        wm.modal_handler_add(self)
+    print(f"Saved debug script to: {debug_script_path}")
+    
+    # Execute in background Blender process
+    try:
+        blender_exe = bpy.app.binary_path
+        print(f"Using Blender executable: {blender_exe}")
+        cmd = [blender_exe, '--background', '--python', temp_script_path]
         
-        return {'RUNNING_MODAL'}
+        print(f"Processing assets in background...")
+        import subprocess
+        process = subprocess.run(cmd, capture_output=True, text=True)
+        
+        print(f"Return code: {process.returncode}")
+        print(f"Output: {process.stdout}")
+        if process.stderr:
+            print(f"Error output: {process.stderr}")
+        
+        if process.returncode == 0:
+            print(f"Successfully processed all assets")
+            os.remove(temp_script_path)  # Clean up
+            return True
+        else:
+            print(f"Error processing files: {process.stderr}")
+            return False
+    except Exception as e:
+        print(f"Error: {e}")
+        return False
+
+def main():
+    """Main function"""
+    # Register the asset library
+    register_asset_library()
     
-    def cancel(self, context):
-        wm = context.window_manager
-        if self._timer:
-            wm.event_timer_remove(self._timer)
-        self.is_running = False
-        print("GLB Watcher stopped")
-
-class GLBWatcherStopOperator(bpy.types.Operator):
-    """Stop the GLB file watcher"""
-    bl_idname = "wm.glb_watcher_stop"
-    bl_label = "Stop GLB Watcher"
+    # Process all GLB files without changing current scene
+    process_all_glb_files()
     
-    def execute(self, context):
-        # Find and stop any running watchers
-        for window in context.window_manager.windows:
-            for area in window.screen.areas:
-                for region in area.regions:
-                    if region.type == 'WINDOW':
-                        override = {'window': window, 'screen': window.screen, 'area': area, 'region': region}
-                        bpy.ops.wm.glb_watcher(override)
-        return {'FINISHED'}
+    # Final message
+    print("All files processed. Assets available in the Asset Browser under 'TRELLIS Assets'")
 
-def register():
-    bpy.utils.register_class(GLBWatcherOperator)
-    bpy.utils.register_class(GLBWatcherStopOperator)
-
-def unregister():
-    bpy.utils.unregister_class(GLBWatcherOperator)
-    bpy.utils.unregister_class(GLBWatcherStopOperator)
-
+# Entry point
 if __name__ == "__main__":
-    register()
-    
-    # Start the watcher
-    bpy.ops.wm.glb_watcher()
+    main()

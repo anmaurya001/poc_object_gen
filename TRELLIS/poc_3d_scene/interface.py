@@ -348,31 +348,41 @@ class SceneGeneratorInterface:
                     #         outputs=debug_output
                     #     )
 
+
                     def generate_assets_with_progress(prompts_file, output_dir, delete_existing, model_choice, seed, sparse_steps, slat_steps):
-                        return self.generator.generate_all_assets(
-                            prompts_file,
-                            output_dir,
-                            delete_existing,
-                            seed,
-                            sparse_steps,
-                            slat_steps,
-                            model_name=model_choice,
-                            progress=gr.Progress()
-                        )
+                        try:
+                            # Disable button immediately
+                            disable_btn = gr.update(interactive=False)
+
+                            # Show intermediate state
+                            yield disable_btn, "Starting generation..."
+
+                            # Do the actual generation
+                            result = self.generator.generate_all_assets(
+                                prompts_file,
+                                output_dir,
+                                delete_existing,
+                                seed,
+                                sparse_steps,
+                                slat_steps,
+                                model_name=model_choice,
+                                progress=gr.Progress()
+                            )
+
+                            # Re-enable button & return result
+                            enable_btn = gr.update(interactive=True)
+                            yield enable_btn, result
+
+                        except Exception as e:
+                            enable_btn = gr.update(interactive=True)
+                            yield enable_btn, f"Error during generation: {str(e)}"
 
                     generate_btn.click(
-                        generate_assets_with_progress,
-                        inputs=[
-                            prompts_file,
-                            output_dir,
-                            delete_existing,
-                            model_choice,
-                            seed,
-                            sparse_steps,
-                            slat_steps,
-                        ],
-                        outputs=output
+                        fn=generate_assets_with_progress,
+                        inputs=[prompts_file, output_dir, delete_existing, model_choice, seed, sparse_steps, slat_steps],
+                        outputs=[generate_btn, output]
                     )
+
 
         return demo
 

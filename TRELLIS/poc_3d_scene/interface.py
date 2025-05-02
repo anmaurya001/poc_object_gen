@@ -309,7 +309,7 @@ class SceneGeneratorInterface:
                         )
 
                     delete_existing = gr.Checkbox(
-                        label="Delete existing output directory", value=True
+                        label="Delete existing output directory", value=False
                     )
 
                     generate_btn = gr.Button("Generate Assets")

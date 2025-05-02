@@ -7,7 +7,17 @@ OUTPUT_DIR = BASE_DIR / "generated_assets"
 PROMPTS_FILE = BASE_DIR / "prompts.json"
 
 # TRELLIS pipeline settings
-TRELLIS_MODEL = "JeffreyXiang/TRELLIS-text-large"
+TRELLIS_TEXT_LARGE_MODEL = "JeffreyXiang/TRELLIS-text-large"
+TRELLIS_TEXT_BASE_MODEL = "JeffreyXiang/TRELLIS-text-base"
+
+# Default model configuration
+DEFAULT_TRELLIS_MODEL = "TRELLIS-text-base"  # Default model to use
+
+# Model name mapping
+TRELLIS_MODEL_NAME_MAP = {
+    "TRELLIS-text-large": TRELLIS_TEXT_LARGE_MODEL,
+    "TRELLIS-text-base": TRELLIS_TEXT_BASE_MODEL,
+}
 SPCONV_ALGO = "native"
 
 # INITIAL MESSAGE

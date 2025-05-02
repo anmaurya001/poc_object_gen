@@ -9,13 +9,14 @@ from config import (
     OUTPUT_DIR,
     PROMPTS_FILE,
     INITIAL_MESSAGE,
+    DEFAULT_TRELLIS_MODEL,
 )
 
 
 class SceneGeneratorInterface:
     def __init__(self):
         self.agent = ScenePlanningAgent()
-        self.generator = AssetGenerator()
+        self.generator = AssetGenerator(default_model=DEFAULT_TRELLIS_MODEL)
         self.INITIAL_MESSAGE = INITIAL_MESSAGE
         # Delete existing prompts file if it exists
         delete_prompts_file()
@@ -294,9 +295,19 @@ class SceneGeneratorInterface:
                         )
 
                     with gr.Row():
+                        # Model selection - default to base model
+                        model_choice = gr.Radio(
+                            choices=["TRELLIS-text-large", "TRELLIS-text-base"],
+                            value=DEFAULT_TRELLIS_MODEL,  # Use default from config
+                            label="TRELLIS Model",
+                            interactive=True
+                        )
+                        
                         seed = gr.Number(
                             label="Random Seed", value=DEFAULT_SEED, interactive=True
                         )
+
+                    with gr.Row():
                         sparse_steps = gr.Number(
                             label="Sparse Structure Steps",
                             value=DEFAULT_SPARSE_STEPS,
@@ -315,7 +326,7 @@ class SceneGeneratorInterface:
                     generate_btn = gr.Button("Generate Assets")
                     output = gr.Textbox(label="Generation Progress", lines=10)
 
-                    def generate_assets_with_progress(prompts_file, output_dir, delete_existing, seed, sparse_steps, slat_steps):
+                    def generate_assets_with_progress(prompts_file, output_dir, delete_existing, model_choice, seed, sparse_steps, slat_steps):
                         return self.generator.generate_all_assets(
                             prompts_file,
                             output_dir,
@@ -323,6 +334,7 @@ class SceneGeneratorInterface:
                             seed,
                             sparse_steps,
                             slat_steps,
+                            model_name=model_choice,
                             progress=gr.Progress()
                         )
 
@@ -332,6 +344,7 @@ class SceneGeneratorInterface:
                             prompts_file,
                             output_dir,
                             delete_existing,
+                            model_choice,
                             seed,
                             sparse_steps,
                             slat_steps,

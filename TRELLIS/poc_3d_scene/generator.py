@@ -11,7 +11,6 @@ from trellis.pipelines import TrellisTextTo3DPipeline
 from trellis.utils import postprocessing_utils, render_utils
 import imageio
 from config import (
-    TRELLIS_MODEL,
     SPCONV_ALGO,
     DEFAULT_SEED,
     DEFAULT_SPARSE_STEPS,
@@ -20,6 +19,8 @@ from config import (
     OUTPUT_DIR,
     LOG_LEVEL,
     LOG_FORMAT,
+    TRELLIS_MODEL_NAME_MAP,
+    DEFAULT_TRELLIS_MODEL,
 )
 
 # Set up logging
@@ -28,11 +29,18 @@ logger = logging.getLogger(__name__)
 
 
 class AssetGenerator:
-    def __init__(self):
+    def __init__(self, default_model=DEFAULT_TRELLIS_MODEL):
         os.environ["SPCONV_ALGO"] = SPCONV_ALGO
-        self.pipeline = TrellisTextTo3DPipeline.from_pretrained(TRELLIS_MODEL)
-        self.pipeline.cuda()
+        self.pipeline = None
+        self.current_model = None
+        self.termination_thread = None
+        self.start_termination_server()
+        
+        # Load the default model during initialization
+        self.load_model(default_model)
     
+    def start_termination_server(self):
+        """Start the termination server in a separate thread"""
         def handle_termination():
             server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -57,9 +65,51 @@ class AssetGenerator:
                 except Exception as e:
                     logger.error(f"Error handling connection: {e}")
 
-
         self.termination_thread = threading.Thread(target=handle_termination)
         self.termination_thread.start()
+
+    def cleanup(self):
+        """Clean up the current model"""
+        if self.pipeline is not None:
+            try:
+                # Move to CPU first
+                if hasattr(self.pipeline, 'cuda'):
+                    self.pipeline.cpu()
+                del self.pipeline
+                self.pipeline = None
+                self.current_model = None
+                logger.info("Successfully cleaned up pipeline")
+            except Exception as e:
+                logger.error(f"Error during cleanup: {e}")
+
+    def load_model(self, model_name):
+        """Load a specific TRELLIS model"""
+        try:
+            # Clean up existing model if any
+            if self.pipeline is not None:
+                if self.current_model != model_name:
+                    logger.info(f"Switching from {self.current_model} to {model_name}")
+                    self.cleanup()
+                else:
+                    logger.info(f"Model {model_name} is already loaded")
+                    return True
+
+            # Load new model
+            logger.info(f"Loading model: {model_name}")
+            self.pipeline = TrellisTextTo3DPipeline.from_pretrained(TRELLIS_MODEL_NAME_MAP[model_name])
+            self.pipeline.cuda()
+            self.current_model = model_name
+            logger.info(f"Successfully loaded model: {model_name}")
+            return True
+        except Exception as e:
+            logger.error(f"Error loading model {model_name}: {e}")
+            return False
+
+    def __del__(self):
+        """Cleanup when the object is destroyed"""
+        self.cleanup()
+        if self.termination_thread:
+            self.termination_thread.join(timeout=1.0)
 
     def generate_preview_image(self, mesh, output_path):
         """Generate a preview image for the mesh and save it"""
@@ -98,12 +148,17 @@ class AssetGenerator:
         object_name,
         prompt,
         output_dir,
+        model_name="TRELLIS-text-large",  # Default to large model
         seed=DEFAULT_SEED,
         sparse_steps=DEFAULT_SPARSE_STEPS,
         slat_steps=DEFAULT_SLAT_STEPS,
     ):
         """Generate 3D assets for a single object."""
         try:
+            # Ensure the correct model is loaded
+            if not self.load_model(model_name):
+                return False, f"Failed to load model {model_name}", None
+
             outputs = self.pipeline.run(
                 prompt,
                 seed=seed,
@@ -155,6 +210,7 @@ class AssetGenerator:
         seed=DEFAULT_SEED,
         sparse_steps=DEFAULT_SPARSE_STEPS,
         slat_steps=DEFAULT_SLAT_STEPS,
+        model_name="TRELLIS-text-large",
     ):
         """Process all objects in a scene."""
         scene_name = scene_data["name"]
@@ -169,6 +225,7 @@ class AssetGenerator:
                 obj["name"],
                 obj["prompt"],
                 output_dir,
+                model_name,
                 seed,
                 sparse_steps,
                 slat_steps,
@@ -193,6 +250,7 @@ class AssetGenerator:
         seed=DEFAULT_SEED,
         sparse_steps=DEFAULT_SPARSE_STEPS,
         slat_steps=DEFAULT_SLAT_STEPS,
+        model_name="TRELLIS-text-large",
         progress=None,
     ):
         """Generate assets for all scenes in the prompts file."""
@@ -213,7 +271,7 @@ class AssetGenerator:
             for i, scene in enumerate(data["scenes"], 1):
                 progress(i / total_scenes, desc=f"Processing scene {i}/{total_scenes}")
                 results = self.process_scene(
-                    scene, output_dir, progress, seed, sparse_steps, slat_steps
+                    scene, output_dir, progress, seed, sparse_steps, slat_steps, model_name
                 )
                 all_results.extend(results)
                 progress(i / total_scenes, desc=f"Completed scene {i}/{total_scenes}")

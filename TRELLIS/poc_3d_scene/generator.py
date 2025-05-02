@@ -292,11 +292,11 @@ class AssetGenerator:
                 all_results.extend(results)
                 progress(i / total_scenes, desc=f"Completed scene {i}/{total_scenes}")
 
-            all_results.append("\n=== Summary of Generated Assets ===")
-            for root, _, files in os.walk(output_dir):
-                for file in files:
-                    if file.endswith(".glb"):
-                        all_results.append(f"- {os.path.join(root, file)}")
+            # all_results.append("\n=== Summary of Generated Assets ===")
+            # for root, _, files in os.walk(output_dir):
+            #     for file in files:
+            #         if file.endswith(".glb"):
+            #             all_results.append(f"- {os.path.join(root, file)}")
 
             return "\n".join(all_results)
         except Exception as e:

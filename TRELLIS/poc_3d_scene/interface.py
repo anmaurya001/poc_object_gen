@@ -282,17 +282,22 @@ class SceneGeneratorInterface:
                     )
 
                 with gr.TabItem("Generate 3D Assets"):
-                    with gr.Row():
-                        prompts_file = gr.Textbox(
-                            label="Prompts JSON File",
-                            value=str(PROMPTS_FILE),
-                            interactive=True,
-                        )
-                        output_dir = gr.Textbox(
-                            label="Output Directory",
-                            value=str(OUTPUT_DIR),
-                            interactive=True,
-                        )
+                    # Info section at the top
+                    with gr.Group():
+                        gr.Markdown("### File Locations")
+                        with gr.Row():
+                            prompts_file = gr.Textbox(
+                                label="Prompts JSON File",
+                                value=str(PROMPTS_FILE),
+                                interactive=False,
+                                show_copy_button=True
+                            )
+                            output_dir = gr.Textbox(
+                                label="Assets Directory",
+                                value=str(OUTPUT_DIR),
+                                interactive=False,
+                                show_copy_button=True
+                            )
 
                     with gr.Row():
                         # Model selection - default to base model

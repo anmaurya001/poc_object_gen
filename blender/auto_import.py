@@ -1,12 +1,17 @@
 import bpy
 import os
+from pathlib import Path
+
+# Get user's home directory
+HOME_DIR = str(Path.home())
 
 # Directories
-WATCH_DIR = "F:/poc/text_to_3d/TRELLIS/generated_assets"
-ASSET_LIBRARY_DIR = "F:/poc/text_to_3d/blender_assets"
+WATCH_DIR = os.path.join(HOME_DIR, ".trellis", "assets")  # Where generated GLB files are stored
+ASSET_LIBRARY_DIR = os.path.join(HOME_DIR, ".trellis", "blender_assets")  # Where Blender assets are stored
 COMBINED_BLEND_FILE = os.path.join(ASSET_LIBRARY_DIR, "trellis_assets.blend")
 
-# Create asset library directory if it doesn't exist
+# Create directories if they don't exist
+os.makedirs(WATCH_DIR, exist_ok=True)
 os.makedirs(ASSET_LIBRARY_DIR, exist_ok=True)
 
 def register_asset_library():

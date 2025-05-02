@@ -5,9 +5,11 @@ import shutil
 import socket
 import threading
 import os
+import numpy as np
 from pathlib import Path
 from trellis.pipelines import TrellisTextTo3DPipeline
-from trellis.utils import postprocessing_utils
+from trellis.utils import postprocessing_utils, render_utils
+import imageio
 from config import (
     TRELLIS_MODEL,
     SPCONV_ALGO,
@@ -59,6 +61,37 @@ class AssetGenerator:
         self.termination_thread = threading.Thread(target=handle_termination)
         self.termination_thread.start()
 
+    def generate_preview_image(self, mesh, output_path):
+        """Generate a preview image for the mesh and save it"""
+        try:
+            # Generate a high-quality preview
+            mesh_img = render_utils.render_snapshot(
+                mesh
+            )['normal']
+            
+            if isinstance(mesh_img, list) and len(mesh_img) > 0:
+                # Get the first image
+                preview_img = mesh_img[0]
+                
+                # Convert to uint8 if needed
+                if preview_img.dtype != np.uint8:
+                    preview_img = (preview_img * 255).astype(np.uint8)
+                
+                # Make sure image is in RGB format
+                if len(preview_img.shape) == 3 and preview_img.shape[2] > 3:
+                    preview_img = preview_img[:, :, :3]
+                
+                # Save the preview image
+                imageio.imwrite(output_path, preview_img)
+                logger.info(f"Generated preview: {output_path}")
+                return True
+            else:
+                logger.warning(f"Failed to generate preview: No image data")
+                return False
+        except Exception as e:
+            logger.error(f"Error generating preview image: {e}")
+            return False
+
     def generate_assets(
         self,
         scene_name,
@@ -84,18 +117,32 @@ class AssetGenerator:
                 },
             )
 
-            base_filename = f"{scene_name}_{object_name}"
-            base_path = os.path.join(output_dir, base_filename)
+            # Handle versioning for the base filename
+            base_filename = object_name
+            version = 0
+            while True:
+                if version == 0:
+                    # First try without version number
+                    glb_path = os.path.join(output_dir, f"{base_filename}.glb")
+                    if not os.path.exists(glb_path):
+                        break
+                    version = 1
+                else:
+                    # Try with version number
+                    glb_path = os.path.join(output_dir, f"{base_filename}_v{version}.glb")
+                    if not os.path.exists(glb_path):
+                        break
+                    version += 1
 
+            # Generate the GLB file
             glb = postprocessing_utils.to_glb(
                 outputs["gaussian"][0],
                 outputs["mesh"][0],
                 simplify=0.95,
                 texture_size=1024,
             )
-            glb_path = f"{base_path}.glb"
             glb.export(glb_path)
-
+            
             return True, f"Successfully generated assets for {object_name}", glb_path
         except Exception as e:
             return False, f"Error generating assets for {object_name}: {str(e)}", None

@@ -91,8 +91,7 @@ This will:
     - Open Blender
     - Click on Scripting and New.
     - Paste the script from blender/auto_import.py.
-    - Make sure to change the WATCH_DIR to path where the assets are saved. It would be ```<local_repo_path>/TRELLIS/generated_assets.```
-    - Click run
+    - Click run.
     - Note - If you have new assets, rerun it.
 
 ## Acknowledgments

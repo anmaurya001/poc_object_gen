@@ -56,11 +56,15 @@ pip install -r requirements.txt
 ```
 
 ## Usage
-1. Start the LLM NIM in seperate WSL shell.
-[LLama 3.1 NIM](https://build.nvidia.com/meta/llama-3_1-8b-instruct/deploy?environment=wsl2.md)
+1. Start the LLM NIM
+```bash
+cd nim_llm
+pip install -r requirements.txt
+python run_llama.py
+```
 
 
-2. Start the application:
+3. Start the application:
 ```bash
 # On Windows:
 set ATTN_BACKEND=flash-attn

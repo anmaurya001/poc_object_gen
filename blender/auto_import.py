@@ -44,7 +44,7 @@ def register_asset_library():
         print(f"Please add manually: Edit > Preferences > File Paths > Asset Libraries")
         return False
 
-def process_glb_file(glb_file):
+def process_glb_file(glb_file,overwrite_existing):
     """Process a single GLB file and create an asset"""
     filepath = os.path.join(WATCH_DIR, glb_file)
     print(f"Processing: {glb_file}")
@@ -52,10 +52,15 @@ def process_glb_file(glb_file):
     # Get the file basename for naming
     file_basename = os.path.splitext(glb_file)[0]
     
-    # Check if an object with this name already exists
+    # Check if an object with this name already exists and delete it
     if file_basename in bpy.data.objects:
-        print(f"Asset '{file_basename}' already exists. Skipping.")
-        return None
+        if not overwrite_existing:
+            print(f"Asset '{file_basename}' already exists. Skipping...")
+            return None
+        else:
+            print(f"Asset '{file_basename}' already exists. Overwriting...")
+            old_obj = bpy.data.objects[file_basename]
+            bpy.data.objects.remove(old_obj, do_unlink=True)
     
     # Create a temporary collection for processing
     temp_collection = bpy.data.collections.new(f"temp_{file_basename}")
@@ -137,7 +142,7 @@ def process_glb_file(glb_file):
     print(f"Created asset object: {file_basename}")
     return merged_obj
 
-def process_all_glb_files():
+def process_all_glb_files(overwrite_existing=False):
     """Process all GLB files in the current Blender session"""
     # Get all GLB files
     if not os.path.exists(WATCH_DIR):
@@ -154,7 +159,7 @@ def process_all_glb_files():
     
     # Process each file
     for glb_file in glb_files:
-        process_glb_file(glb_file)
+        process_glb_file(glb_file,overwrite_existing)
     
     # Save the combined file
     print(f"Saving all assets to: {COMBINED_BLEND_FILE}")
@@ -167,7 +172,7 @@ def main():
     register_asset_library()
     
     # Process all GLB files
-    process_all_glb_files()
+    process_all_glb_files(overwrite_existing=False)
     
     # Final message
     print("All files processed. Assets available in the Asset Browser under 'TRELLIS Assets'")

@@ -52,6 +52,11 @@ def process_glb_file(glb_file):
     # Get the file basename for naming
     file_basename = os.path.splitext(glb_file)[0]
     
+    # Check if an object with this name already exists
+    if file_basename in bpy.data.objects:
+        print(f"Asset '{file_basename}' already exists. Skipping.")
+        return None
+    
     # Create a temporary collection for processing
     temp_collection = bpy.data.collections.new(f"temp_{file_basename}")
     # Link the temporary collection to the scene but hide it

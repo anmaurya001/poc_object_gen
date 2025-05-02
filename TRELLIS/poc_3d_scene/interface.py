@@ -326,6 +326,28 @@ class SceneGeneratorInterface:
                     generate_btn = gr.Button("Generate Assets")
                     output = gr.Textbox(label="Generation Progress", lines=10)
 
+                    # Debug section for model switching
+                    # with gr.Group():
+                    #     gr.Markdown("### Debug Model Switching")
+                    #     debug_model_choice = gr.Radio(
+                    #         choices=["TRELLIS-text-large", "TRELLIS-text-base"],
+                    #         value=DEFAULT_TRELLIS_MODEL,
+                    #         label="Switch Model",
+                    #         interactive=True
+                    #     )
+                    #     debug_switch_btn = gr.Button("Switch Model & Check VRAM")
+                    #     debug_output = gr.Textbox(label="Debug Output", lines=5)
+
+                    #     def debug_switch_model(model_name):
+                    #         success, message = self.generator.debug_switch_model(model_name)
+                    #         return message
+
+                    #     debug_switch_btn.click(
+                    #         debug_switch_model,
+                    #         inputs=[debug_model_choice],
+                    #         outputs=debug_output
+                    #     )
+
                     def generate_assets_with_progress(prompts_file, output_dir, delete_existing, model_choice, seed, sparse_steps, slat_steps):
                         return self.generator.generate_all_assets(
                             prompts_file,

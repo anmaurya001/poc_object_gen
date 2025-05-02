@@ -6,6 +6,8 @@ import socket
 import threading
 import os
 import numpy as np
+import torch
+import gc
 from pathlib import Path
 from trellis.pipelines import TrellisTextTo3DPipeline
 from trellis.utils import postprocessing_utils, render_utils
@@ -75,9 +77,23 @@ class AssetGenerator:
                 # Move to CPU first
                 if hasattr(self.pipeline, 'cuda'):
                     self.pipeline.cpu()
+
+                # Clear internal tensors if any
+                if hasattr(self.pipeline, '__dict__'):
+                    for k, v in list(vars(self.pipeline).items()):
+                        if torch.is_tensor(v):
+                            setattr(self.pipeline, k, None)
+                            del v
+                # Delete the model reference
                 del self.pipeline
                 self.pipeline = None
                 self.current_model = None
+
+                # Force garbage collection
+                gc.collect()
+
+                # Empty unused memory from GPU cache
+                torch.cuda.empty_cache()
                 logger.info("Successfully cleaned up pipeline")
             except Exception as e:
                 logger.error(f"Error during cleanup: {e}")
@@ -285,4 +301,35 @@ class AssetGenerator:
             return "\n".join(all_results)
         except Exception as e:
             return f"Error processing prompts file: {str(e)}"
+
+    #FOR DEBUGGING ONLY
+    def debug_switch_model(self, model_name):
+        """Debug function to switch models and check VRAM usage"""
+        try:
+            import torch
+            
+            # Get initial VRAM usage
+            if torch.cuda.is_available():
+                initial_vram = torch.cuda.memory_allocated()
+                logger.info(f"Initial VRAM usage: {initial_vram / 1024**3:.2f} GB")
+            
+            # Clean up current model
+            self.cleanup()
+            
+            # Get VRAM after cleanup
+            if torch.cuda.is_available():
+                after_cleanup_vram = torch.cuda.memory_allocated()
+                logger.info(f"VRAM after cleanup: {after_cleanup_vram / 1024**3:.2f} GB")
+            
+            # Load new model
+            success = self.load_model(model_name)
+            
+            # Get VRAM after loading
+            if torch.cuda.is_available():
+                after_load_vram = torch.cuda.memory_allocated()
+                logger.info(f"VRAM after loading {model_name}: {after_load_vram / 1024**3:.2f} GB")
+            
+            return success, f"Model switched to {model_name}. VRAM usage logged."
+        except Exception as e:
+            return False, f"Error during model switch: {str(e)}"
 

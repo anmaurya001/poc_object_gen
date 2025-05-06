@@ -1,19 +1,14 @@
 #!/bin/bash
 set -e # Exit immediately if a command exits with a non-zero status.
 
-# Ensure we are in the application directory (redundant if WORKDIR is set correctly, but safe)
+# Ensure we are in the application directory
 cd /app/trellis
 
-echo "Starting TRELLIS container entrypoint (running as root)..."
+echo "Starting TRELLIS container entrypoint (running as user)..."
 
-# Set cache directories for Hugging Face and PyTorch to subdirectories
-# within the persistent volume mount point /app/persistent_cache
-export HF_HOME="/app/persistent_cache/huggingface"
-export TORCH_HOME="/app/persistent_cache/torch"
-
-# Ensure these cache subdirectories exist within the mounted volume (important!)
-# This handles the case where the volume is newly created or empty
-mkdir -p "$HF_HOME" "$TORCH_HOME"
+# Removed custom cache directory setup and HF_HOME/TORCH_HOME exports.
+# Hugging Face and PyTorch will use their default cache locations
+# within ~/.cache/, which is handled by the volume mount to /home/user/.cache in podman run.
 
 echo "Checking for and downloading TRELLIS model (requires GPU access)..."
 # Use the absolute path to the python executable
@@ -33,6 +28,7 @@ echo "Model download/check complete."
 #   /usr/bin/python -m pip install rembg
 # fi
 # --- End Runtime Fixes ---
+
 
 echo "Executing main application command..."
 exec "$@"
